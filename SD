@@ -1,0 +1,2197 @@
+
+PERFORM OBTENER_ORDENES.
+
+ IF git_log[] IS NOT INITIAL.
+
+   PERFORM guarda_log.
+
+ENDIF.
+
+
+
+FORM obtener_ordenes.
+
+
+
+  DATA: lo_http_client TYPE REF TO if_http_client,
+        lo_rest_client TYPE REF TO cl_rest_http_client,
+        lv_url         TYPE        string VALUE 'usuarios',
+        lv_body        TYPE        string,
+        token          TYPE        string,
+        agreements     TYPE        string,
+        "Create a structure(or deep) that exactly matches your JSON response
+        "abap_response      TYPE        zca_serno_ln,
+        lo_response    TYPE REF TO     if_rest_entity.
+* Create HTTP intance using RFC restination created
+* You can directly use the REST service URL as well
+  cl_http_client=>create_by_destination(
+   EXPORTING
+     destination              = 'APP_RUTA'    " Logical destination (specified in function call)
+   IMPORTING
+     client                   = lo_http_client    " HTTP Client Abstraction
+   EXCEPTIONS
+     argument_not_found       = 1
+     destination_not_found    = 2
+     destination_no_authority = 3
+     plugin_not_active        = 4
+     internal_error           = 5
+     OTHERS                   = 6
+ ).
+
+* Create REST client instance
+  CREATE OBJECT lo_rest_client
+    EXPORTING
+      io_http_client = lo_http_client.
+* Set HTTP version
+  lo_http_client->request->set_version( if_http_request=>co_protocol_version_1_1 ).
+  IF lo_http_client IS BOUND AND lo_rest_client IS BOUND.
+
+* Set the URI if any
+    cl_http_utility=>set_request_uri(
+      EXPORTING
+        request = lo_http_client->request    " HTTP Framework (iHTTP) HTTP Request
+        "uri     = 'usuarios/'"lv_url  '                   " URI String (in the Form of /path?query-string)
+        uri     = 'ObtenerOrdenesSAP'
+
+    ).
+
+    CALL METHOD lo_rest_client->if_rest_client~set_request_header
+      EXPORTING
+        iv_name  = 'X-API-KEY'
+        iv_value = '612e648bf9594adb50844cad6895f2cf'.
+
+
+* HTTP GET
+    lo_rest_client->if_rest_client~get( ).
+
+* HTTP response
+    lo_response = lo_rest_client->if_rest_client~get_response_entity( ).
+
+* HTTP return status
+    DATA(http_status)   = lo_response->get_header_field( '~status_code' ).
+
+* HTTP JSON return string
+
+
+    "break rmartinez.
+
+    DATA:
+      bdata    TYPE xstring,
+      g_str    TYPE string,
+      app_type TYPE char30.
+
+    g_str = lo_response->get_string_data( ).
+
+    CLEAR bdata.
+    app_type = 'text/unicode; charset=utf-16le'.
+
+
+    CALL FUNCTION 'SCMS_STRING_TO_XSTRING'
+      EXPORTING
+        text     = g_str
+        mimetype = app_type
+*       ENCODING =
+      IMPORTING
+        buffer   = bdata
+* EXCEPTIONS
+*       FAILED   = 1
+*       OTHERS   = 2
+      .
+
+
+    "deserialize JSON string json into internal table lt_flight doing camelCase to ABAP like field name mapping
+    "/ui2/cl_json=>deserialize( EXPORTING json = G_STR pretty_name = /ui2/cl_json=>pretty_mode-CAMEL_CASE CHANGING data = result_orders ).
+
+    DATA: cadena_json       TYPE TABLE OF string WITH HEADER LINE,
+          json_detalles     TYPE TABLE OF string WITH HEADER LINE,
+          json_temp         TYPE TABLE OF string,
+          json_detalle_temp TYPE TABLE OF string,
+          wa_orders         LIKE LINE OF result_orders,
+          wa_item_detalle   LIKE LINE OF result_item_producto,
+          aux1              TYPE string,
+          aux2              TYPE string.
+
+    REPLACE ALL OCCURRENCES OF '"' IN g_str WITH ''.
+    SPLIT g_str AT '{order_id' INTO TABLE cadena_json.
+    DELETE cadena_json INDEX 1.
+
+    DATA: i_amb TYPE char3.
+    SELECT SINGLE low INTO i_amb FROM tvarvc WHERE name EQ 'Z_AMBIENTE'.
+    LOOP AT cadena_json INTO DATA(w_json).
+
+      SPLIT w_json AT ',' INTO TABLE json_temp.
+
+      "leemo la primera propiedad de del rest
+      READ TABLE json_temp INTO DATA(w_auxjsonfila1) INDEX 1.
+      SPLIT w_auxjsonfila1 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-order_id = aux2.
+      CLEAR: aux1, aux2.
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila2) INDEX 2.
+      SPLIT w_auxjsonfila2 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-id_seller = aux2.
+      CLEAR: aux1, aux2.
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila3) INDEX 3.
+      SPLIT w_auxjsonfila3 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-id_client = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila4) INDEX 4.
+      SPLIT w_auxjsonfila4 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-id_address = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila5) INDEX 5.
+      SPLIT w_auxjsonfila5 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-id_status_order = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila6) INDEX 6.
+      SPLIT w_auxjsonfila6 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-id_centro = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila7) INDEX 7.
+      SPLIT w_auxjsonfila7 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-code_order = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila8) INDEX 8.
+      SPLIT w_auxjsonfila8 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-use_factura_id = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila9) INDEX 9.
+      SPLIT w_auxjsonfila9 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-negociacion = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila10) INDEX 10.
+      SPLIT w_auxjsonfila10 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-canal_distribucion = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila11) INDEX 11.
+      SPLIT w_auxjsonfila11 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-source = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila12) INDEX 12.
+      SPLIT w_auxjsonfila12 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      REPLACE ALL OCCURRENCES OF '-' IN aux2 WITH space.
+      wa_orders-fecha_finalizado = aux2(8).
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila13) INDEX 13.
+      SPLIT w_auxjsonfila13 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-numero_pedido_sap = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila14) INDEX 14.
+      SPLIT w_auxjsonfila14 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-numero_entrega_sap = aux2.
+      CLEAR: aux1, aux2.
+
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila15) INDEX 15.
+      SPLIT w_auxjsonfila15 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-bloqueado = aux2.
+      CLEAR: aux1, aux2.
+
+
+      READ TABLE json_temp INTO DATA(w_auxjsonfila16) INDEX 16.
+      SPLIT w_auxjsonfila16 AT ':' INTO aux1 aux2.
+
+      IF aux2 EQ 'null'.
+        CLEAR aux2.
+      ENDIF.
+      wa_orders-fecha_procesado_sap = aux2.
+      CLEAR: aux1, aux2.
+
+      IF i_amb EQ 'DEV' OR  i_amb EQ 'QAS'.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila23) INDEX 23.
+        SPLIT w_auxjsonfila23 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-idformapago = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila24) INDEX 24.
+        SPLIT w_auxjsonfila24 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-telefono_contacto = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila25) INDEX 25.
+        SPLIT w_auxjsonfila25 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-horario_entrega = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila26) INDEX 26.
+        SPLIT w_auxjsonfila26 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-total = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila27) INDEX 27.
+        SPLIT w_auxjsonfila27 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-nombre = aux2.
+        CLEAR: aux1, aux2.
+
+      ELSE.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila18) INDEX 18.
+        SPLIT w_auxjsonfila18 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-idformapago = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila19) INDEX 19.
+        SPLIT w_auxjsonfila19 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-telefono_contacto = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila20) INDEX 20.
+        SPLIT w_auxjsonfila20 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-horario_entrega = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila21) INDEX 21.
+        SPLIT w_auxjsonfila21 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-total = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_temp INTO DATA(w_auxjsonfila22) INDEX 22.
+        SPLIT w_auxjsonfila22 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_orders-nombre = aux2.
+        CLEAR: aux1, aux2.
+
+      ENDIF.
+
+
+      SPLIT w_json AT '{detail_order_id' INTO TABLE json_detalles.
+
+      DELETE json_detalles INDEX 1.
+
+      LOOP AT json_detalles INTO DATA(w_det).
+
+        REPLACE ALL OCCURRENCES OF '}' IN w_det WITH ''.
+        REPLACE ALL OCCURRENCES OF ']' IN w_det WITH ''.
+
+        SPLIT w_det AT ',' INTO TABLE json_detalle_temp.
+
+
+        "leemo la primera propiedad de del rest
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila1) INDEX 1.
+        SPLIT w_auxjsondetfila1 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-detail_order_id = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila2) INDEX 2.
+        SPLIT w_auxjsondetfila2 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-matnr = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila3) INDEX 3.
+        SPLIT w_auxjsondetfila3 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-vrkme = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila4) INDEX 4.
+        SPLIT w_auxjsondetfila4 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-maktx = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila5) INDEX 5.
+        SPLIT w_auxjsondetfila5 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-stock = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila6) INDEX 6.
+        SPLIT w_auxjsondetfila6 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-kbetr = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila7) INDEX 7.
+        SPLIT w_auxjsondetfila7 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-umrez = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila8) INDEX 8.
+        SPLIT w_auxjsondetfila8 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-meins = aux2.
+        CLEAR: aux1, aux2.
+
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila9) INDEX 9.
+        SPLIT w_auxjsondetfila9 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-porcentaje = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila10) INDEX 10.
+        SPLIT w_auxjsondetfila10 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-preciominimo = aux2.
+        CLEAR: aux1, aux2.
+
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila11) INDEX 11.
+        SPLIT w_auxjsondetfila11 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-preciosugerido = aux2.
+        CLEAR: aux1, aux2.
+
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila12) INDEX 12.
+        SPLIT w_auxjsondetfila12 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-ispromocion = aux2.
+        CLEAR: aux1, aux2.
+
+
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila13) INDEX 13.
+        SPLIT w_auxjsondetfila13 AT ':' INTO aux1 aux2.
+        wa_item_detalle-numprom = aux2.
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-numprom = aux2.
+        CLEAR: aux1, aux2.
+
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila14) INDEX 14.
+        SPLIT w_auxjsondetfila14 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-ean11 = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila15) INDEX 15.
+        SPLIT w_auxjsondetfila15 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-preciopromocion = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila16) INDEX 16.
+        SPLIT w_auxjsondetfila16 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-precioventa = aux2.
+        CLEAR: aux1, aux2.
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila17) INDEX 17.
+        SPLIT w_auxjsondetfila17 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-cantidad = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila18) INDEX 18.
+        SPLIT w_auxjsondetfila18 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-aplicapromocion = aux2.
+        CLEAR: aux1, aux2.
+
+
+        READ TABLE json_detalle_temp INTO DATA(w_auxjsondetfila19) INDEX 19.
+        SPLIT w_auxjsondetfila19 AT ':' INTO aux1 aux2.
+
+        IF aux2 EQ 'null'.
+          CLEAR aux2.
+        ENDIF.
+        wa_item_detalle-codigoaplicado = aux2.
+        CLEAR: aux1, aux2.
+
+        INSERT wa_item_detalle INTO TABLE wa_orders-detalle_order.
+        CLEAR: wa_item_detalle, json_detalle_temp.
+
+      ENDLOOP.
+
+      INSERT wa_orders INTO TABLE result_orders.
+      CLEAR: wa_orders, json_temp.
+
+    ENDLOOP.
+
+
+
+    DATA: aux TYPE ed.
+
+    PERFORM procesar_pedidos_tablas.
+
+
+    "INSERT ZAPP_PEDIDOS FROM TABLE lt_flight.
+    "COMMIT WORK.
+
+  ENDIF.
+ENDFORM.
+
+
+FORM procesar_pedidos_tablas.
+
+  "Tabla interna con la estructura de la A071
+  DATA: it_a071 TYPE TABLE OF a071 WITH HEADER LINE,
+        lineas  TYPE i.
+
+  margen = ''.
+
+  LOOP AT result_orders INTO DATA(item).
+
+    DATA: prog TYPE sy-repid,
+          V_WERKS type werks.
+    prog = 'ZSD_CARGA_PEDIDOS'.
+    EXPORT prog FROM prog TO MEMORY ID 'ZCARGA_PEDIDOS'.
+
+    DATA orderorderapp LIKE zsd_log_pvr-order_app VALUE ' '.
+
+
+    SELECT SINGLE order_app
+       INTO orderorderapp
+       FROM zsd_log_pvr
+       WHERE order_app EQ item-order_id
+       AND t_mensaje EQ 'S'.
+
+    IF  sy-subrc NE 0.
+      DATA: posnr_contador TYPE i VALUE 0.
+
+      " Llenar estructura de HEADER para la BAPI
+      gs_header_in-doc_type   = 'ZPVE'.
+      gs_header_in-sales_org  = 'OV01'.
+      gs_header_in-distr_chan = item-canal_distribucion.
+      gs_header_in-division   = 'S1'.
+      gs_header_in-sales_grp  = item-id_seller.
+      gs_header_in-sales_off  = item-id_centro.
+      gs_header_in-req_date_h = item-fecha_finalizado.
+      gs_header_in-purch_date = item-fecha_finalizado.
+      gs_header_in-cust_grp1 = item-use_factura_id.
+      gs_header_in-pymt_meth = 'E'.
+
+      IF gs_header_in-cust_grp1 eq 'P01'.
+        gs_header_in-cust_grp1 = 'S01'.
+      ENDIF.
+
+      SELECT SINGLE stcd1 FROM kna1
+      INTO @DATA(rfc)
+      WHERE kunnr EQ @item-id_client.
+
+      IF rfc EQ 'XAXX010101000' AND gs_header_in-cust_grp1 eq 'G01'.
+        gs_header_in-cust_grp1 = 'S01'.
+      ELSE.
+        SELECT SINGLE konzs
+        INTO @DATA(lv_konzs)
+        FROM kna1
+        WHERE kunnr EQ @item-id_client.
+
+        IF lv_konzs EQ '605'.
+           gs_header_in-cust_grp1 = 'S01'.
+        ENDIF.
+      ENDIF.
+
+      " Condiciones de pago
+      IF item-negociacion EQ c_ctfor.
+*        gs_header_in-pmnttrms = c_y001. "<---  OCULTADO POR DEML 27.12.2018 POR F-867
+        gs_header_in-pmnttrms = c_y000. "<---  AGREGADO POR DEML 27.12.2018 POR F-1213 (ANTES F-867 ... HABILITADO 17.06.2019)
+        gs_header_in-accnt_asgn = '01'. "<---  AGREGADO POR DEML 27.12.2018 POR F-1213 (ANTES F-867 ... HABILITADO 17.06.2019)
+        IF item-idformapago = ''.
+          gs_header_in-pymt_meth = 'E'.
+        ELSE.
+          gs_header_in-pymt_meth =  item-idformapago.
+        ENDIF.
+      ENDIF.
+
+      posnr_contador = 0.
+
+      SELECT SINGLE low  FROM tvarvc INTO V_WERKS WHERE name = 'ZSD_CEDIS' AND LOW = item-id_centro AND type = 'S'.
+
+      "detalle del pedido
+      LOOP AT item-detalle_order INTO DATA(itemproduc).
+
+        margen = ''.
+        posnr_contador = ( posnr_contador + 10 ).
+
+        CLEAR: l_matnr, l_meins.
+
+        "Validar existe Material.
+        SELECT SINGLE matnr meins
+          FROM mara
+          INTO (l_matnr, l_meins)
+          WHERE matnr EQ itemproduc-matnr.
+
+        " Se omite el Item si el material no existe
+        IF l_matnr IS INITIAL.
+
+          CONCATENATE  text-e03 itemproduc-matnr text-e04 l_xblnr INTO gv_mensaje
+          SEPARATED BY space.
+
+          MOVE: 'E'         TO gw_log-type,
+                gv_mensaje  TO gw_log-message.
+          APPEND gw_log TO git_log.
+
+          CLEAR: gw_log.
+
+          MOVE: 'SGP'        TO iw_log-pedido,
+                'E'          TO iw_log-t_mensaje,
+                gv_mensaje   TO iw_log-mensaje,
+                sy-datum     TO iw_log-f_carga,
+                sy-uname     TO iw_log-usuario,
+                l_xblnr      TO iw_log-xblnr,
+                item-id_centro TO iw_log-centro,
+                item-id_seller TO iw_log-vendedor,
+                item-order_id TO iw_log-order_app. "<- campo nuevo para validar duplicados (MPEREZ 18.08.2018)
+          APPEND iw_log TO it_log.
+          CLEAR: iw_log.
+
+        ELSE.
+
+          " Inicia Validacion de MARGEN ---------------------
+          CLEAR: l_margen,
+                 l_cond_value,
+                 l_verpr.
+
+
+          "Si el articulo no tiene promocion -> Validar
+          IF itemproduc-aplicapromocion <> 'true'.
+
+            "--------------------------------------------------------------------------------------------
+            "Validación cuando el empaque de venta viene en 0
+            IF itemproduc-umrez EQ 0.
+
+
+              SELECT * FROM a071
+                INTO TABLE it_a071
+                WHERE matnr EQ l_matnr
+                AND vkorg EQ 'OV01' AND vtweg EQ 'C1'
+                AND werks EQ item-id_centro
+                AND datbi GE sy-datum.
+
+              DESCRIBE TABLE it_a071 LINES lineas.
+
+              IF lineas EQ 1.
+                READ TABLE it_a071 INDEX 1.
+
+                SELECT SINGLE m~umrez
+                  FROM marm AS m INNER JOIN a071 AS a
+                ON ( m~matnr = a~matnr  AND m~meinh = a~vrkme )
+                INTO l_umrez
+                WHERE m~matnr EQ itemproduc-matnr
+                  AND a~werks EQ item-id_centro
+                  AND m~meinh EQ it_a071-vrkme.
+
+                MOVE l_umrez TO itemproduc-meins.
+              ENDIF.
+
+            ENDIF.
+
+            "--------------------------------------------------------------------------------------------
+            IF itemproduc-umrez <> 0.
+
+*             IF item-id_centro EQ 'C001'.
+              IF item-id_centro EQ V_WERKS.
+                SELECT SINGLE verpr
+                INTO l_verpr
+                FROM mbew
+               WHERE matnr EQ l_matnr
+                AND bwkey EQ item-id_centro.
+              ELSE.
+                PERFORM get_costo_fin USING l_verpr l_matnr item-id_centro.
+              ENDIF.
+              " Obtener Margen
+              MOVE itemproduc-precioventa TO l_cond_value.
+
+              "l_cond_value = l_cond_value / 100.
+
+*****************  Anexo para el precio de venta unitario - AJDF 07.06.2016 en el anexo del 06/06/2016
+
+
+              DATA: l_clasif1 TYPE taxm1,
+                    l_clasif2 TYPE taxm2,
+                    l_pv_uni  TYPE bapikbetr1.
+
+
+              "Busque del numero de iva e ieps por material
+              SELECT SINGLE taxm1 taxm2 FROM mlan
+                INTO ( l_clasif1 , l_clasif2 )
+                WHERE matnr EQ l_matnr AND aland EQ 'MX'.
+
+
+              IF sy-subrc = 0.
+****************************************************************
+              IF item-id_centro EQ 'C009' OR item-id_centro EQ 'C012' OR item-id_centro EQ 'C015'.
+                IF l_clasif1 EQ l_clasif2.
+                  IF l_clasif1 EQ 0.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez ).
+                  ELSEIF l_clasif1 EQ 1.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08').
+                  ELSEIF l_clasif1 EQ 3.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' / '1.265').
+                  ELSEIF l_clasif1 EQ 4.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' / '1.3' ).
+                  ELSEIF l_clasif1 EQ 5.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' / '1.53' ).
+                  ELSEIF l_clasif1 EQ 6.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' / '1.06' ).
+                  ELSEIF l_clasif1 EQ 7.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' ).
+                  ELSEIF l_clasif1 EQ 8.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' / '1.25').
+                  ELSE.
+                    l_pv_uni = '0.00'.
+                  ENDIF.
+                ELSE.
+                  l_pv_uni = '0.00'.
+                ENDIF.
+             ELSE.
+                IF l_clasif1 EQ l_clasif2.
+                  IF l_clasif1 EQ 0.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez ).
+                  ELSEIF l_clasif1 EQ 1.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.16').
+                  ELSEIF l_clasif1 EQ 3.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.16' / '1.265').
+                  ELSEIF l_clasif1 EQ 4.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.16' / '1.3' ).
+                  ELSEIF l_clasif1 EQ 5.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.16' / '1.53' ).
+                  ELSEIF l_clasif1 EQ 6.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.16' / '1.06' ).
+                  ELSEIF l_clasif1 EQ 7.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.08' ).
+                  ELSEIF l_clasif1 EQ 8.
+                    l_pv_uni = ( l_cond_value / itemproduc-umrez / '1.16' / '1.25').
+                  ELSE.
+                    l_pv_uni = '0.00'.
+                  ENDIF.
+                ELSE.
+                  l_pv_uni = '0.00'.
+                ENDIF.
+              ENDIF.
+****************************************************************
+              ENDIF.
+
+              IF l_pv_uni > '0.00'.
+
+                IF l_matnr EQ '000000000000000959' OR l_matnr EQ '000000000000005320'.
+                  l_margen = 100.
+                ELSE.
+                  l_margen = ( ( l_pv_uni - l_verpr ) / l_pv_uni ) * 100.
+                ENDIF.
+
+
+                IF l_margen < c_margen.
+
+
+                  DATA: lv_str        TYPE string,
+                        lv_str_detail TYPE string.
+
+                  lv_str = posnr_contador.
+                  lv_str_detail = item-order_id.
+*                 IF item-id_centro = 'C001'.
+                  IF item-id_centro = V_WERKS.
+                    margen = 'X'.
+                    CONCATENATE  text-e06 itemproduc-matnr text-e08 lv_str ',' text-e04 lv_str_detail INTO gv_mensaje
+                    SEPARATED BY space.
+                  ELSE.
+                    margen = ''.
+                    CONCATENATE  text-e06 itemproduc-matnr text-e08 lv_str ',' text-e09 lv_str_detail INTO gv_mensaje
+                    SEPARATED BY space.
+                  ENDIF.
+
+                  "MUEVE DATOS AL POP-UP
+                  MOVE: 'E'         TO gw_log-type,
+                        gv_mensaje  TO gw_log-message.
+                  APPEND gw_log TO git_log.
+                  CLEAR: gw_log.
+
+                  "MUEVE DATOS PARA EL LOG DE ERROR
+                  MOVE: ''    TO iw_log-pedido,
+                        'E'            TO iw_log-t_mensaje,
+                        gv_mensaje     TO iw_log-mensaje,
+                        sy-datum       TO iw_log-f_carga,
+                        sy-uname       TO iw_log-usuario,
+                        l_xblnr      TO iw_log-xblnr,
+                        item-id_centro TO iw_log-centro,
+                        item-id_seller TO iw_log-vendedor,
+                        item-order_id TO iw_log-order_app. "<- campo nuevo para validar duplicados (MPEREZ 18.08.2018).
+                  APPEND iw_log TO it_log.
+                  CLEAR: iw_log.
+
+*                    gs_header_in-dlv_block = c_05.
+                  error = 'E'.
+                ENDIF.
+              ELSE.
+
+                IF l_matnr EQ 0.
+                  l_matnr = itemproduc-matnr.
+                ENDIF.
+
+                CONDENSE l_matnr NO-GAPS.
+
+
+                lv_str = posnr_contador.
+                lv_str_detail = itemproduc-detail_order_id.
+
+                CONCATENATE  text-e07 l_matnr text-e08 lv_str ',' text-e04 lv_str_detail INTO gv_mensaje
+                SEPARATED BY space.
+
+                MOVE: 'E'         TO gw_log-type,
+                      gv_mensaje  TO gw_log-message.
+                APPEND gw_log TO git_log.
+                CLEAR: gw_log.
+
+                "MUEVE DATOS PARA EL LOG DE ERROR
+                MOVE: ''    TO iw_log-pedido,
+                      'E'          TO iw_log-t_mensaje,
+                      gv_mensaje   TO iw_log-mensaje,
+                      sy-datum     TO iw_log-f_carga,
+                      sy-uname     TO iw_log-usuario,
+                      l_xblnr      TO iw_log-xblnr,
+                      item-id_centro TO iw_log-centro,
+                      item-id_seller TO iw_log-vendedor,
+                      item-order_id TO iw_log-order_app. "<- campo nuevo para validar duplicados (MPEREZ 18.08.2018).
+
+                APPEND iw_log TO it_log.
+                CLEAR: iw_log.
+
+*                  gs_header_in-dlv_block = c_05.
+
+                error = 'E'.
+
+              ENDIF.
+*****************  Anexo para el precio de venta unitario - AJDF 07.06.2016 en el anexo del 06/06/2016
+            ELSE.
+              "Meter error de articulo en 0
+
+              lv_str = posnr_contador.
+              lv_str_detail = itemproduc-detail_order_id.
+
+              CONCATENATE  'Articulo:' itemproduc-matnr 'con emp. vta. 0,' text-e08 lv_str ',' text-e04 lv_str_detail INTO gv_mensaje
+              SEPARATED BY space.
+
+              "MUEVE DATOS AL POP-UP
+              MOVE: 'E'         TO gw_log-type,
+                    gv_mensaje  TO gw_log-message.
+              APPEND gw_log TO git_log.
+              CLEAR: gw_log.
+
+              "MUEVE DATOS PARA EL LOG DE ERROR
+              MOVE: ''    TO iw_log-pedido,
+                    'E'            TO iw_log-t_mensaje,
+                    gv_mensaje     TO iw_log-mensaje,
+                    sy-datum       TO iw_log-f_carga,
+                    sy-uname       TO iw_log-usuario,
+                    l_xblnr        TO iw_log-xblnr,
+                    item-id_centro TO iw_log-centro,
+                    item-id_seller TO iw_log-vendedor,
+                    item-order_id TO iw_log-order_app. "<- campo nuevo para validar duplicados (MPEREZ 18.08.2018).
+              APPEND iw_log TO it_log.
+              CLEAR: iw_log.
+
+*                    gs_header_in-dlv_block = c_05.
+              error = 'E'.
+            ENDIF.
+
+          ENDIF.
+
+          " Termina Validacion de MARGEN ---------------------
+
+          CLEAR: gs_items_in,
+                 gs_order_schedules_in,
+                 gs_order_conditions_in.
+
+          CLEAR: gs_items_inx,
+                 gs_order_schedules_inx,
+                 gs_order_conditions_inx.
+
+          gs_items_in-itm_number = posnr_contador.
+          gs_items_in-material   = itemproduc-matnr.
+          gs_items_in-plant      = item-id_centro.
+          gs_items_in-store_loc  = 'A001'.
+          gs_items_in-target_qty = itemproduc-cantidad.
+          gs_items_in-ref_1      = itemproduc-codigoaplicado.
+          gs_items_in-target_qu  = itemproduc-vrkme.
+          gs_items_in-sales_unit  = itemproduc-vrkme.
+          "CONDENSE: gs_linep-meins.
+
+          CLEAR: l_meinh, l_umrez.
+
+          MOVE: itemproduc-umrez TO l_umrez.
+
+
+          IF error <> 'E' OR margen = 'X'.
+            APPEND gs_items_in TO gt_items_in.
+
+            gs_items_inx-itm_number = posnr_contador.
+            gs_items_inx-material   = c_x.
+            gs_items_inx-plant      = c_x.
+            gs_items_inx-store_loc  = c_x.
+            gs_items_inx-target_qty = c_x.
+            gs_items_inx-target_qu  = c_x.
+            gs_items_inx-sales_unit  = c_x.
+            APPEND gs_items_inx TO gt_items_inx.
+
+            gs_order_schedules_in-itm_number = posnr_contador.
+            gs_order_schedules_in-req_date   = gs_header_in-req_date_h.
+            gs_order_schedules_in-req_qty    = itemproduc-cantidad.
+            APPEND gs_order_schedules_in TO gt_order_schedules_in.
+
+            gs_order_schedules_inx-itm_number = posnr_contador.
+            gs_order_schedules_inx-req_date   = c_x.
+            gs_order_schedules_inx-req_qty    = c_x.
+            APPEND gs_order_schedules_inx TO gt_order_schedules_inx.
+
+
+            gs_order_conditions_in-itm_number = posnr_contador.
+            gs_order_conditions_in-cond_st_no = '009'.
+            gs_order_conditions_in-cond_count = '01'.
+            gs_order_conditions_in-cond_type  = 'PR00'.
+            gs_order_conditions_in-cond_value = itemproduc-precioventa.
+            gs_order_conditions_in-currency   = 'MXN'.
+            APPEND gs_order_conditions_in TO gt_order_conditions_in.
+
+            gs_order_conditions_inx-itm_number = posnr_contador.
+            gs_order_conditions_inx-cond_st_no = '009'.
+            gs_order_conditions_inx-cond_count = '01'.
+            gs_order_conditions_inx-cond_type  = 'PR00'.
+            gs_order_conditions_inx-cond_value = c_x.
+            gs_order_conditions_inx-currency   = c_x.
+            APPEND gs_order_conditions_inx TO gt_order_conditions_inx.
+          ENDIF.
+
+          CLEAR: error,margen.
+
+        ENDIF.
+
+
+
+      ENDLOOP.
+
+      DATA: l_rfc   TYPE kna1-stcd1.
+
+      IF item-id_client EQ item-id_address.
+
+        "1.- Se busca el RFC del cliente
+        SELECT SINGLE stcd1 FROM kna1
+          INTO l_rfc
+          WHERE kunnr EQ item-id_client.
+
+        IF l_rfc EQ 'XAXX010101000'.
+          SELECT SINGLE kunn2 FROM knvp
+            INTO item-id_address
+            WHERE kunnr EQ item-id_client
+            AND vkorg EQ 'OV01'
+            AND vtweg EQ item-canal_distribucion
+            AND parvw EQ 'WE'
+            AND parza EQ '001'.
+        ENDIF.
+      ENDIF.
+
+
+
+      CLEAR: gs_order_partners.
+      gs_order_partners-partn_role = 'AG'.
+      gs_order_partners-partn_numb = item-id_client.
+
+      APPEND gs_order_partners TO gt_order_partners.
+
+      CLEAR: gs_order_partners.
+      gs_order_partners-partn_role = 'WE'.
+      gs_order_partners-partn_numb = item-id_address.
+
+      APPEND gs_order_partners TO gt_order_partners.
+
+
+      "una vez creada todas las tablas se manda a la Bapi
+      IF gt_items_in[] IS NOT INITIAL.
+
+
+        PERFORM crea_pedido USING item-order_id item-id_centro item-id_seller.
+        PERFORM inicializar.
+
+
+      ELSE.
+
+        " Estructura de pedido #### incompleta
+        " Agregar error NO_ITEMS al Log
+        CLEAR: gv_mensaje.
+        CONCATENATE  text-e02 l_xblnr INTO gv_mensaje
+        SEPARATED BY space.
+
+        MOVE: 'E'         TO gw_log-type,
+              gv_mensaje  TO gw_log-message.
+        APPEND gw_log TO git_log.
+        CLEAR: gw_log.
+
+        "MUEVE DATOS PARA EL LOG DE ERROR
+        MOVE: ''    TO iw_log-pedido,
+              'E'          TO iw_log-t_mensaje,
+              gv_mensaje   TO iw_log-mensaje,
+              sy-datum     TO iw_log-f_carga,
+              sy-uname     TO iw_log-usuario,
+              l_xblnr      TO iw_log-xblnr,
+              item-id_centro TO iw_log-centro,
+              item-id_seller TO iw_log-vendedor,
+              item-order_id TO iw_log-order_app. "<- campo nuevo para validar duplicados (MPEREZ 18.08.2018).
+        APPEND iw_log TO it_log.
+        CLEAR: iw_log.
+
+        DATA: pedidoprocesado TYPE ty_pedido.
+
+        pedidoprocesado-numeropedido = '0'.
+        pedidoprocesado-numeroentrega = '0'.
+        pedidoprocesado-idorder =  item-order_id.
+***BEGIN OF REMN 10.01.2018 -- Reasignación del valor de la variable BLOQUEADO a 4 (Folio 932)
+        pedidoprocesado-bloqueado  = 4."1.
+***END OF REMN 10.01.2018
+        "PERFORM Actualizar_RestApi_App using PedidoProcesado.
+***BEGIN OF REMN 05.06.2018 -- Se agrega a la tabla a pesar de que esté bloqueado, posteriormente se envía masivo
+        APPEND pedidoprocesado TO tabla_pedidos_actualiza.
+***END OF REMN 05.06.2018
+        PERFORM inicializar.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+  "break rmartinez.
+  PERFORM actualizar_restapi_app_remn TABLES tabla_pedidos_actualiza.
+
+  CLEAR:tabla_pedidos_actualiza.
+
+
+ENDFORM.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  CREA_PEDIDO
+*&---------------------------------------------------------------------*
+*   Ejecuta la BAPI que genera el pedido de ventas
+*----------------------------------------------------------------------*
+FORM crea_pedido USING p_xblnr TYPE string
+                       p_centro TYPE string
+                       p_vendedor TYPE string .
+
+  DATA: l_cliente TYPE bapiparnr.
+  "El siguiente apartado es para la modificación de Gladys que aun esta en pruebas
+  DATA: l_id      TYPE sy-msgid VALUE 'V1',
+*        l_number  TYPE sy-msgno VALUE '311',
+        l_number2 TYPE sy-msgno VALUE '260', "Se ha grabado con entrega
+        l_number3 TYPE sy-msgno VALUE '609', "Se ha grabado con entrega parcial
+        l_number4 TYPE sy-msgno VALUE '261', "Se ha grabado sin entrega
+        l_number5 TYPE sy-msgno VALUE '150', "Se ha grabado sin entrega
+        l_number6 TYPE sy-msgno VALUE '154', "Bloqueo de Cliente
+        sales_doc TYPE vbeln.
+
+  CALL FUNCTION 'BAPI_SALESORDER_CREATEFROMDAT2'
+    EXPORTING
+      order_header_in      = gs_header_in
+    IMPORTING
+      salesdocument = sales_doc
+    TABLES
+      return               = gt_return
+      order_items_in       = gt_items_in
+      order_items_inx      = gt_items_inx
+      order_partners       = gt_order_partners
+      order_schedules_in   = gt_order_schedules_in
+      order_schedules_inx  = gt_order_schedules_inx
+      order_conditions_in  = gt_order_conditions_in
+      order_conditions_inx = gt_order_conditions_inx.
+  break rmartinez.
+  READ TABLE gt_return INTO gs_return WITH KEY type ='E'.
+
+  IF sy-subrc NE 0.
+
+    CLEAR: gs_return.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = 'X'.
+
+*    -------------------------------------------------------------
+*      SE AGREGA VALIDACION PARA CUANDO SEA <> CS02
+*      SE CREE LA ENTREGA JVILLEGAS 30/09/2022
+*    -------------------------------------------------------------
+    data: sales_order_items TYPE TABLE OF bapidlvreftosalesorder,
+          sales_order_item  TYPE bapidlvreftosalesorder.
+
+     IF gs_header_in-sales_off <> 'CS02'.
+       sales_order_item-ref_doc = sales_doc.
+       APPEND sales_order_item TO sales_order_items.
+       CALL FUNCTION 'BAPI_OUTB_DELIVERY_CREATE_SLS'
+        EXPORTING
+          SHIP_POINT              = gs_header_in-sales_off
+          DUE_DATE                = sy-datum
+*          DEBUG_FLG               =
+*          NO_DEQUEUE              = ' '
+*        IMPORTING
+*          DELIVERY                =
+*          NUM_DELIVERIES          =
+         TABLES
+           sales_order_items       = sales_order_items
+*          SERIAL_NUMBERS          =
+*          EXTENSION_IN            =
+*          DELIVERIES              =
+*          CREATED_ITEMS           =
+*          EXTENSION_OUT           =
+*          RETURN                  =
+                 .
+       CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+       EXPORTING
+        wait = 'X'.
+
+     ENDIF.
+*    -------------------------------------------------------------
+
+    READ TABLE gt_return INTO gs_return WITH KEY type = 'S'
+                                                   id = l_id
+                                               number = l_number2.
+    IF sy-subrc <> 0.
+      READ TABLE gt_return INTO gs_return WITH KEY type = 'S'
+                                                   id = l_id
+                                               number = l_number3.
+      IF sy-subrc <> 0.
+        READ TABLE gt_return INTO gs_return WITH KEY type = 'S'
+                                                  id = l_id
+                                              number = l_number4.
+      ENDIF.
+    ENDIF.
+    " Se gererar el pedido #####
+    CLEAR: gv_mensaje.
+
+
+
+    DATA: pedidoprocesado TYPE ty_pedido,
+          bloqueadopedido TYPE i VALUE 1,
+          temp_vbeln      TYPE char50.
+
+    READ TABLE gt_return INTO gs_return WITH KEY type = 'S'
+                                                   id = 'V1'.
+    IF sy-subrc NE 0.
+      READ TABLE gt_return INTO gs_return WITH KEY type = 'S'
+                                                   id = 'VP'.
+    ENDIF.
+    temp_vbeln = gs_return-message_v2.
+    PERFORM sales_orderchange USING temp_vbeln.
+    PERFORM bapi_desc_veladoras USING temp_vbeln.
+    pedidoprocesado-numeropedido = gs_return-message_v2.
+    pedidoprocesado-numeroentrega = gs_return-message_v3.
+    pedidoprocesado-idorder =  p_xblnr.
+
+    break mperez.
+    PERFORM revisar_pedido USING bloqueadopedido pedidoprocesado-numeropedido.
+
+    pedidoprocesado-bloqueado = bloqueadopedido.
+
+    IF gs_return-id EQ 'V1' AND gs_return-number EQ 423.
+      pedidoprocesado-bloqueado = 2.
+    ELSEIF gs_return-id EQ 'VP' AND gs_return-number EQ 200.
+      pedidoprocesado-bloqueado = 3.
+    ENDIF.
+
+    "PERFORM Actualizar_RestApi_App using PedidoProcesado.
+***BEGIN OF REMN 05.06.2018 -- Se agregan los pedidos a la tabla
+    APPEND pedidoprocesado TO tabla_pedidos_actualiza.
+***END OF REMN 05.06.2018
+
+    IF  gs_header_in-dlv_block IS INITIAL.
+
+*
+      CONCATENATE  text-010 ' ' gs_return-message_v2 ',' INTO gv_mensaje.
+
+      IF gs_return-number EQ '609'.
+        CONCATENATE  gv_mensaje text-039 gs_return-message_v3 INTO gv_mensaje SEPARATED BY ' '.
+      ELSEIF gs_return-number EQ '261'.
+        CONCATENATE  gv_mensaje 'Sin entrega' INTO gv_mensaje SEPARATED BY ' '.
+      ELSE.
+        CONCATENATE  gv_mensaje text-038 gs_return-message_v3 INTO gv_mensaje SEPARATED BY ' '.
+      ENDIF.
+
+
+      MOVE: 'S' TO gw_log-type,
+            gv_mensaje  TO gw_log-message.
+      APPEND gw_log TO git_log.
+      CLEAR: gw_log.
+
+      break mperez.
+      LOOP AT it_log INTO DATA(l_log) WHERE xblnr = l_xblnr AND pedido = ''.
+        "Mueve el pedido a la estructura
+        MOVE: gs_return-message_v2 TO l_log-pedido.
+        "Modifica los campos vacios de la tabla
+        MODIFY it_log FROM l_log .
+      ENDLOOP.
+
+      "MUEVE DATOS PARA EL LOG DE ERROR
+      MOVE: "sy-mandt             TO iw_log-mandt,
+            gs_return-message_v2 TO iw_log-pedido,
+            'S'                  TO iw_log-t_mensaje,
+            gv_mensaje           TO iw_log-mensaje,
+            sy-datum             TO iw_log-f_carga,
+            sy-uname             TO iw_log-usuario,
+            p_centro TO iw_log-centro,
+            p_vendedor TO iw_log-vendedor,
+            p_xblnr        TO iw_log-xblnr.
+      iw_log-order_app = iw_log-xblnr.
+
+      APPEND iw_log TO it_log.
+      CLEAR: iw_log.
+
+    ELSE.
+
+      CONCATENATE  text-007 gs_return-message_v2 INTO gv_mensaje.
+
+      MOVE: 'S' TO gw_log-type,
+            gv_mensaje  TO gw_log-message.
+      APPEND gw_log TO git_log.
+      CLEAR: gw_log.
+
+      LOOP AT it_log INTO DATA(l_log2) WHERE xblnr = p_xblnr AND pedido = ''.
+        "Mueve el pedido a la estructura
+        MOVE: gs_return-message_v2 TO l_log2-pedido.
+        "Modifica los campos vacios de la tabla
+        MODIFY it_log FROM l_log2 .
+      ENDLOOP.
+
+      "MUEVE DATOS PARA EL LOG DE ERROR
+      MOVE: "sy-mandt             TO iw_log-mandt,
+            gs_return-message_v2 TO iw_log-pedido,
+            'S'                  TO iw_log-t_mensaje,
+            gv_mensaje           TO iw_log-mensaje,
+            sy-datum             TO iw_log-f_carga,
+            sy-uname             TO iw_log-usuario,
+            p_centro TO iw_log-centro,
+            p_vendedor TO iw_log-vendedor,
+            p_xblnr              TO iw_log-xblnr.
+      iw_log-order_app = iw_log-xblnr.
+      APPEND iw_log TO it_log.
+      CLEAR: iw_log.
+    ENDIF.
+
+  ELSE."si el pedido salio mal
+
+    READ TABLE gt_return INTO gs_return WITH KEY type = 'E'
+                                                    id = l_id
+                                                number = l_number5.
+
+    IF sy-subrc EQ 0.
+
+      READ TABLE gt_order_partners INTO l_cliente WITH KEY partn_role = 'AG'.
+
+      CONCATENATE gs_return-message ' - Cliente: ' l_cliente-partn_numb INTO gs_return-message.
+
+      CLEAR: gv_mensaje.
+
+      CONCATENATE  text-e01 ' ' p_xblnr ' - Cliente: ' l_cliente-partn_numb INTO gv_mensaje.
+
+      CLEAR: l_cliente.
+
+    ELSE.
+
+      READ TABLE gt_return INTO gs_return WITH KEY type = 'E'
+                                                    id = l_id
+                                                number = l_number6.
+
+      IF sy-subrc EQ 0.
+
+        READ TABLE gt_order_partners INTO l_cliente WITH KEY partn_role = 'AG'.
+
+        CONCATENATE gs_return-message ' - Cliente: ' l_cliente-partn_numb INTO gs_return-message.
+
+        CLEAR: gv_mensaje.
+
+        CONCATENATE  text-e01 ' ' p_xblnr ' - Cliente: ' l_cliente-partn_numb INTO gv_mensaje.
+
+        CLEAR: l_cliente.
+
+      ELSE.
+
+        READ TABLE gt_return INTO gs_return WITH KEY type = 'E'
+                                                      id = 'VP'
+                                                  number = l_number5.
+
+        IF sy-subrc EQ 0.
+
+          READ TABLE gt_order_partners INTO l_cliente WITH KEY partn_role = 'AG'.
+
+          CONCATENATE gs_return-message ' - Cliente: ' l_cliente-partn_numb INTO gs_return-message.
+
+          CLEAR: gv_mensaje.
+
+          CONCATENATE  text-e01 ' ' p_xblnr ' - Cliente: ' l_cliente-partn_numb INTO gv_mensaje.
+
+          CLEAR: l_cliente.
+
+        ELSE.
+          READ TABLE gt_return INTO gs_return WITH KEY type = 'E'
+                                                        id = 'VP'
+                                                    number = l_number6.
+
+          IF sy-subrc EQ 0.
+
+            READ TABLE gt_order_partners INTO l_cliente WITH KEY partn_role = 'AG'.
+
+            CONCATENATE gs_return-message ' - Cliente: ' l_cliente-partn_numb INTO gs_return-message.
+
+            CLEAR: gv_mensaje.
+
+            CONCATENATE  text-e01 ' ' p_xblnr ' - Cliente: ' l_cliente-partn_numb INTO gv_mensaje.
+
+            CLEAR: l_cliente.
+
+          ELSE.
+
+            CLEAR: gv_mensaje.
+
+            CONCATENATE  text-e01 p_xblnr INTO gv_mensaje.
+
+          ENDIF.
+
+        ENDIF.
+
+      ENDIF.
+    ENDIF.
+
+
+    " Mensaje que regresa la Bapi
+    MOVE: 'E'         TO gw_log-type,
+          gs_return-message  TO gw_log-message.
+    APPEND gw_log TO git_log.
+    CLEAR: gw_log.
+
+    "MUEVE DATOS PARA EL LOG DE ERROR
+    MOVE: "sy-mandt             TO iw_log-mandt,
+           'E'                  TO iw_log-t_mensaje,
+           gs_return-message    TO iw_log-mensaje,
+           sy-datum             TO iw_log-f_carga,
+           sy-uname             TO iw_log-usuario,
+           p_centro TO iw_log-centro,
+            p_vendedor TO iw_log-vendedor,
+           p_xblnr              TO iw_log-xblnr.
+    iw_log-order_app = iw_log-xblnr.
+    APPEND iw_log TO it_log.
+    CLEAR: iw_log.
+
+*    " Agregar error al log
+*    " No se pudo gererar el pedido #####
+
+    MOVE: 'E'         TO gw_log-type,
+          gv_mensaje  TO gw_log-message.
+    APPEND gw_log TO git_log.
+    CLEAR: gw_log.
+
+    LOOP AT it_log INTO DATA(l_log3) WHERE xblnr = p_xblnr AND pedido = ''.
+      "Mueve el pedido a la estructura
+      MOVE: gs_return-message_v2 TO l_log3-pedido.
+      "Modifica los campos vacios de la tabla
+      MODIFY it_log FROM l_log3.
+    ENDLOOP.
+
+    "MUEVE DATOS PARA EL LOG DE ERROR
+    MOVE: "sy-mandt             TO iw_log-mandt,
+           gs_return-message_v2 TO iw_log-pedido,
+           'E'                  TO iw_log-t_mensaje,
+           gv_mensaje           TO iw_log-mensaje,
+           sy-datum             TO iw_log-f_carga,
+           sy-uname             TO iw_log-usuario,
+           p_centro TO iw_log-centro,
+            p_vendedor TO iw_log-vendedor,
+           p_xblnr              TO iw_log-xblnr.
+    iw_log-order_app = iw_log-xblnr.
+    APPEND iw_log TO it_log.
+    CLEAR: iw_log.
+
+
+
+    DATA: auxpedidoprocesado TYPE ty_pedido.
+
+    auxpedidoprocesado-numeropedido = 0.
+    auxpedidoprocesado-numeroentrega = 0.
+    auxpedidoprocesado-idorder =  p_xblnr.
+    auxpedidoprocesado-bloqueado = 1.
+
+    READ TABLE gt_return INTO gs_return WITH KEY type = 'E'
+                                                  id = 'V1'
+                                              number = '423'.
+    IF sy-subrc EQ 0.
+      auxpedidoprocesado-bloqueado = 2.
+    ELSE.
+      READ TABLE gt_return INTO gs_return WITH KEY type = 'E'
+                                              id = 'VP'
+                                          number = '200'.
+      IF sy-subrc EQ 0.
+        auxpedidoprocesado-bloqueado = 3.
+      ENDIF.
+    ENDIF.
+
+    break rmartinez.
+***BEGIN OF REMN 05.06.2018 -- Se agrega a la tabla para envío masivo
+    APPEND auxpedidoprocesado TO tabla_pedidos_actualiza.
+***END OF REMN 05.06.2018
+    "PERFORM Actualizar_RestApi_App using auxPedidoProcesado.
+
+  ENDIF.
+
+ENDFORM.
+
+FORM actualizar_restapi_app USING presultadopedidosap TYPE ty_pedido.
+
+
+
+  DATA: lo_http_client TYPE REF TO if_http_client,
+        lo_rest_client TYPE REF TO cl_rest_http_client,
+        lv_url         TYPE        string VALUE 'usuarios',
+        lv_body        TYPE        string,
+        token          TYPE        string,
+        agreements     TYPE        string,
+        "Create a structure(or deep) that exactly matches your JSON response
+        "abap_response      TYPE        zca_serno_ln,
+        lo_response    TYPE REF TO     if_rest_entity,
+        lo_request     TYPE REF TO if_rest_entity.
+
+* Create HTTP intance using RFC restination created
+* You can directly use the REST service URL as well
+  cl_http_client=>create_by_destination(
+   EXPORTING
+     destination              = 'APP_RUTA'    " Logical destination (specified in function call)
+   IMPORTING
+     client                   = lo_http_client    " HTTP Client Abstraction
+   EXCEPTIONS
+     argument_not_found       = 1
+     destination_not_found    = 2
+     destination_no_authority = 3
+     plugin_not_active        = 4
+     internal_error           = 5
+     OTHERS                   = 6
+ ).
+
+  " Create REST client instance
+  CREATE OBJECT lo_rest_client
+    EXPORTING
+      io_http_client = lo_http_client.
+
+* Set HTTP version
+  lo_http_client->request->set_version( if_http_request=>co_protocol_version_1_1 ).
+  IF lo_http_client IS BOUND AND lo_rest_client IS BOUND.
+    "DATA(id) = 'XYZ'.
+    "CONCATENATE 'agreements/' id INTO lv_url.
+* Set the URI if any
+    cl_http_utility=>set_request_uri(
+      EXPORTING
+        request = lo_http_client->request    " HTTP Framework (iHTTP) HTTP Request
+        "uri     = 'usuarios/'"lv_url  '                   " URI String (in the Form of /path?query-string)
+        "uri     = 'selectUsuario/?usuario=99&password=1'
+        uri     = 'OrdenActualizaEstadoSAPLote'
+
+    ).
+* Set request header if any
+    CALL METHOD lo_rest_client->if_rest_client~set_request_header
+      EXPORTING
+        iv_name  = 'X-API-KEY'
+        iv_value = '612e648bf9594adb50844cad6895f2cf'.
+
+
+
+* serialize table lt_flight into JSON, skipping initial fields and converting ABAP field names into camelCase
+    " lv_body = /ui2/cl_json=>serialize( data = git_kna1 compress = abap_true pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+    lv_body = /ui2/cl_json=>serialize( data = presultadopedidosap compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+
+* Set Payload or body ( JSON or XML)
+    lo_request = lo_rest_client->if_rest_client~create_request_entity( ).
+    lo_request->set_content_type( iv_media_type = if_rest_media_type=>gc_appl_json ).
+    lo_request->set_string_data( lv_body ).
+
+
+* HTTP GET
+    lo_rest_client->if_rest_client~post( lo_request ).
+
+* HTTP response
+    lo_response = lo_rest_client->if_rest_client~get_response_entity( ).
+
+* HTTP return status
+    DATA(http_status)   = lo_response->get_header_field( '~status_code' ).
+
+* HTTP JSON return string
+    DATA(json_response) = lo_response->get_string_data( ).
+
+    DATA:objectresult TYPE ty_result_apirest.
+
+    CLEAR objectresult.
+    "DESEREALIZAMOS EL RESULTADO PARA MOSTRARLO.
+    /ui2/cl_json=>deserialize( EXPORTING json = json_response pretty_name = /ui2/cl_json=>pretty_mode-camel_case CHANGING data = objectresult ).
+
+
+    IF objectresult-estado = 'X'.
+
+    ELSE.
+
+
+    ENDIF.
+
+
+
+
+  ENDIF.
+
+
+ENDFORM.
+
+FORM revisar_pedido USING pbloqueado TYPE i
+                          pnumeropedido TYPE string.
+
+  DATA: pnumeroaux(10) TYPE c.
+
+  pnumeroaux = pnumeropedido.
+
+  CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+    EXPORTING
+      input  = pnumeroaux
+    IMPORTING
+      output = pnumeroaux.
+
+  SELECT spstg
+    INTO @DATA(estadopedido)
+    FROM vbuk
+    WHERE vbeln = @pnumeroaux.
+  ENDSELECT.
+
+
+
+  IF estadopedido = 'C'.
+    pbloqueado = 1.
+
+  ELSE.
+    pbloqueado = 0.
+
+  ENDIF.
+
+
+
+
+
+ENDFORM.
+
+FORM inicializar .
+
+  REFRESH: gt_items_in,
+           gt_order_partners,
+           gt_order_schedules_in,
+           gt_order_conditions_in,
+           gt_return.
+
+  REFRESH: gt_items_inx,
+           gt_order_schedules_inx,
+           gt_order_conditions_inx.
+
+
+  CLEAR: gs_header_in.
+
+ENDFORM.
+
+
+FORM guarda_log.
+
+  DATA:
+    l_int    TYPE num51,
+    it_lg    TYPE TABLE OF zsd_log_pvr WITH HEADER LINE,
+    it_obs   TYPE STANDARD TABLE OF zsd_txt_ped WITH HEADER LINE,
+    wa_obs   TYPE zsd_txt_ped,
+    wa_lg    TYPE zsd_log_pvr,
+    orderapp LIKE zsd_log_pvr-order_app VALUE ' '.
+
+  SELECT SINGLE MAX( id_error ) INTO l_int FROM zsd_log_pvr.
+  break mperez.
+  LOOP AT it_log INTO DATA(l_log).
+
+*    validacion para los pedidos duplicados
+*    ABAP: Miguel angel Perez.
+    SELECT SINGLE order_app
+    INTO orderapp
+    FROM zsd_log_pvr
+    WHERE order_app EQ l_log-order_app
+    AND t_mensaje EQ 'S'.
+
+    IF sy-subrc NE 0 .
+
+      l_int = l_int + 1.
+
+*    l_log-id_error = l_int.
+*
+*    l_log-vendedor = p_line-idven.
+*
+*    l_log-centro   = p_werks.
+*
+*    MODIFY it_log FROM l_log.
+      wa_lg-id_error  = l_int.
+      wa_lg-pedido    = l_log-pedido.
+      wa_lg-t_mensaje = l_log-t_mensaje.
+      wa_lg-mensaje   = l_log-mensaje.
+      wa_lg-f_carga   = l_log-f_carga.
+      wa_lg-usuario   = l_log-usuario.
+      wa_lg-vendedor  = l_log-vendedor.
+      wa_lg-centro    = l_log-centro.
+      wa_lg-order_app = l_log-order_app.
+
+
+      DATA: order_app TYPE string.
+
+      order_app = l_log-order_app.
+
+      SHIFT order_app LEFT DELETING LEADING '0'.
+      CONDENSE order_app NO-GAPS.
+
+      IF l_log-t_mensaje EQ 'S'.
+
+        READ TABLE result_orders INTO DATA(wa) WITH KEY order_id = order_app.
+        IF sy-subrc EQ 0.
+          wa_obs-vbeln = l_log-pedido.
+          wa_obs-text = wa-horario_entrega.
+          wa_obs-telf1 = wa-telefono_contacto.
+          APPEND wa_obs TO it_obs.
+        ENDIF.
+        CLEAR: wa_obs.
+
+      ENDIF.
+      CLEAR: order_app.
+
+      APPEND wa_lg TO it_lg.
+    ENDIF.
+  ENDLOOP.
+  INSERT zsd_txt_ped FROM TABLE it_obs.
+  INSERT zsd_log_pvr FROM TABLE it_lg.
+
+  IF sy-subrc = 0.
+    MESSAGE text-009 TYPE 'S'.
+  ELSE.
+    MESSAGE text-010 TYPE 'S'.
+  ENDIF.
+
+  REFRESH: it_log, it_lg.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ACTUALIZAR_RESTAPI_APP_REMN
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_PEDIDOPROCESADO  text
+*----------------------------------------------------------------------*
+FORM actualizar_restapi_app_remn TABLES presultadopedidosap LIKE tabla_pedidos_actualiza.
+
+
+
+  DATA: lo_http_client TYPE REF TO if_http_client,
+        lo_rest_client TYPE REF TO cl_rest_http_client,
+        lv_url         TYPE        string VALUE 'usuarios',
+        lv_body        TYPE        string,
+        token          TYPE        string,
+        agreements     TYPE        string,
+        "Create a structure(or deep) that exactly matches your JSON response
+        "abap_response      TYPE        zca_serno_ln,
+        lo_response    TYPE REF TO     if_rest_entity,
+        lo_request     TYPE REF TO if_rest_entity.
+
+* Create HTTP intance using RFC restination created
+* You can directly use the REST service URL as well
+  cl_http_client=>create_by_destination(
+   EXPORTING
+     destination              = 'APP_RUTA'    " Logical destination (specified in function call)
+   IMPORTING
+     client                   = lo_http_client    " HTTP Client Abstraction
+   EXCEPTIONS
+     argument_not_found       = 1
+     destination_not_found    = 2
+     destination_no_authority = 3
+     plugin_not_active        = 4
+     internal_error           = 5
+     OTHERS                   = 6
+ ).
+
+  " Create REST client instance
+  CREATE OBJECT lo_rest_client
+    EXPORTING
+      io_http_client = lo_http_client.
+
+* Set HTTP version
+  lo_http_client->request->set_version( if_http_request=>co_protocol_version_1_1 ).
+  IF lo_http_client IS BOUND AND lo_rest_client IS BOUND.
+    "DATA(id) = 'XYZ'.
+    "CONCATENATE 'agreements/' id INTO lv_url.
+* Set the URI if any
+    cl_http_utility=>set_request_uri(
+      EXPORTING
+        request = lo_http_client->request    " HTTP Framework (iHTTP) HTTP Request
+        "uri     = 'usuarios/'"lv_url  '                   " URI String (in the Form of /path?query-string)
+        "uri     = 'selectUsuario/?usuario=99&password=1'
+        uri     = 'OrdenActualizaEstadoSAPLote'
+
+    ).
+* Set request header if any
+    CALL METHOD lo_rest_client->if_rest_client~set_request_header
+      EXPORTING
+        iv_name  = 'X-API-KEY'
+        iv_value = '612e648bf9594adb50844cad6895f2cf'.
+
+
+
+    lv_body = /ui2/cl_json=>serialize( data = presultadopedidosap[] compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+
+* Set Payload or body ( JSON or XML)
+    lo_request = lo_rest_client->if_rest_client~create_request_entity( ).
+    lo_request->set_content_type( iv_media_type = if_rest_media_type=>gc_appl_json ).
+    lo_request->set_string_data( lv_body ).
+
+
+* HTTP GET
+    lo_rest_client->if_rest_client~post( lo_request ).
+
+* HTTP response
+    lo_response = lo_rest_client->if_rest_client~get_response_entity( ).
+
+* HTTP return status
+    DATA(http_status)   = lo_response->get_header_field( '~status_code' ).
+
+* HTTP JSON return string
+    DATA(json_response) = lo_response->get_string_data( ).
+
+    DATA:objectresult TYPE ty_result_apirest.
+
+    CLEAR objectresult.
+    "DESEREALIZAMOS EL RESULTADO PARA MOSTRARLO.
+    /ui2/cl_json=>deserialize( EXPORTING json = json_response pretty_name = /ui2/cl_json=>pretty_mode-camel_case CHANGING data = objectresult ).
+
+
+    IF objectresult-estado = 'X'.
+
+    ELSE.
+
+
+    ENDIF.
+
+
+
+
+  ENDIF.
+ENDFORM.
+
+FORM get_costo_fin USING l_verpr l_matnr l_werks.
+
+  TYPES: BEGIN OF ty_kbtr,
+           kbetr LIKE konp-kbetr,
+         END OF ty_kbtr.
+
+  DATA: it_kbtr   TYPE STANDARD TABLE OF ty_kbtr WITH HEADER LINE,
+        l_bwscl   LIKE mara-bwscl,
+        l_lifnr   LIKE eina-lifnr,
+        l_infnr   LIKE eina-infnr,
+        l_ltsnr   LIKE eina-ltsnr,
+        l_kbetr   LIKE konp-kbetr,
+        l_kmein   LIKE konp-kmein,
+        l_kbetr_2 LIKE konp-kbetr,
+        l_umrez   LIKE marm-umrez,
+        l_umren   LIKE marm-umren,
+        l_ausme   LIKE marc-ausme,
+        l_meins   LIKE mara-meins,
+        l_mwskz   LIKE eine-mwskz,
+        l_model   LIKE marc-werks.
+
+
+ SELECT SINGLE low FROM tvarvc INTO ( l_model ) WHERE name = 'ZSD_CENTRO_MOD' AND type = 'P'.
+
+  SELECT SINGLE ei~lifnr ei~ltsnr
+ INTO ( l_lifnr,l_ltsnr )
+ FROM eina AS ei
+ INNER JOIN lfa1 AS lf ON ( ei~lifnr EQ lf~lifnr  )
+ WHERE ei~matnr EQ l_matnr
+ AND ei~verkf EQ 'X'.
+
+  SELECT SINGLE bwscl
+  INTO l_bwscl
+  FROM marc
+  WHERE werks EQ l_werks
+  AND matnr EQ l_matnr.
+
+  IF l_bwscl EQ '1'.
+    SELECT SINGLE kp~kbetr kp~kmein ee~mwskz
+    INTO ( l_kbetr  ,l_kmein , l_mwskz )
+    FROM eina AS ei
+     INNER JOIN eine AS ee ON ( ee~infnr EQ ei~infnr )
+    INNER JOIN a017 AS a7 ON ( a7~lifnr EQ ei~lifnr AND a7~matnr EQ ei~matnr AND a7~ekorg EQ ee~ekorg AND a7~werks EQ ee~werks  )
+     INNER JOIN konp AS kp ON ( kp~knumh EQ a7~knumh )
+    WHERE ei~matnr EQ l_matnr
+    AND ei~verkf EQ 'X'
+    AND ee~ekorg EQ 'OC01'
+    AND ee~esokz EQ '0'
+    AND ee~werks EQ l_werks
+    AND a7~datab <= sy-datum
+    AND a7~datbi >= sy-datum
+    AND kp~kschl EQ 'PB00'.
+    IF sy-subrc NE 0.
+      SELECT SINGLE kp~kbetr kp~kmein ee~mwskz
+      INTO (l_kbetr  ,l_kmein , l_mwskz)
+      FROM eina AS ei
+       INNER JOIN eine AS ee ON ( ee~infnr EQ ei~infnr )
+      INNER JOIN a067 AS a7 ON ( a7~lifnr EQ ei~lifnr AND a7~matnr EQ ei~matnr AND a7~ekorg EQ ee~ekorg AND a7~werks EQ ee~werks  )
+       INNER JOIN konp AS kp ON ( kp~knumh EQ a7~knumh )
+      WHERE ei~matnr EQ l_matnr
+      AND ei~verkf EQ 'X'
+      AND ee~ekorg EQ 'OC01'
+      AND ee~esokz EQ '0'
+      AND ee~werks EQ l_werks
+      AND a7~datab <= sy-datum
+      AND a7~datbi >= sy-datum
+      AND kp~kschl EQ 'PB00'.
+
+    ENDIF.
+
+  ELSEIF l_bwscl EQ '2'.
+    SELECT SINGLE kp~kbetr kp~kmein ee~mwskz
+     INTO ( l_kbetr  ,l_kmein , l_mwskz )
+     FROM eina AS ei
+      INNER JOIN eine AS ee ON ( ee~infnr EQ ei~infnr )
+     INNER JOIN a017 AS a7 ON ( a7~lifnr EQ ei~lifnr AND a7~matnr EQ ei~matnr AND a7~ekorg EQ ee~ekorg AND a7~werks EQ ee~werks  )
+      INNER JOIN konp AS kp ON ( kp~knumh EQ a7~knumh )
+     WHERE ei~matnr EQ l_matnr
+     AND ei~verkf EQ 'X'
+     AND ee~ekorg EQ 'OC01'
+     AND ee~esokz EQ '0'
+     AND ee~werks EQ l_model
+     AND a7~datab <= sy-datum
+     AND a7~datbi >= sy-datum
+     AND kp~kschl EQ 'PB00'
+     AND ei~matnr NOT IN ( SELECT matnr FROM eord WHERE matnr EQ l_matnr AND werks EQ l_werks ).
+    IF sy-subrc NE 0.
+      SELECT SINGLE kp~kbetr kp~kmein ee~mwskz
+      INTO ( l_kbetr  ,l_kmein , l_mwskz )
+      FROM eina AS ei
+       INNER JOIN eine AS ee ON ( ee~infnr EQ ei~infnr )
+      INNER JOIN a067 AS a7 ON ( a7~lifnr EQ ei~lifnr AND a7~matnr EQ ei~matnr AND a7~ekorg EQ ee~ekorg AND a7~werks EQ ee~werks  )
+       INNER JOIN konp AS kp ON ( kp~knumh EQ a7~knumh )
+      WHERE ei~matnr EQ l_matnr
+      AND ei~verkf EQ 'X'
+      AND ee~ekorg EQ 'OC01'
+      AND ee~esokz EQ '0'
+      AND ee~werks EQ l_model
+      AND a7~datab <= sy-datum
+      AND a7~datbi >= sy-datum
+      AND kp~kschl EQ 'PB00'
+      AND ei~matnr NOT IN ( SELECT matnr FROM eord WHERE matnr EQ l_matnr AND werks EQ l_werks ).
+    ENDIF.
+  ENDIF.
+
+**• OrgCompras/Proveedor/Surt.parc.
+  SELECT kp~kbetr
+  APPENDING TABLE it_kbtr
+  FROM t001w AS tw
+  INNER JOIN a913 AS a9 ON ( a9~ekorg EQ tw~ekorg  )
+  INNER JOIN konp AS kp ON ( kp~knumh  EQ a9~knumh )
+  WHERE tw~werks EQ l_werks
+  AND a9~kschl IN ( 'ZDC1','ZDC2' ,'ZDC3', 'ZDC4', 'ZDC5', 'ZDC6'  )
+  AND a9~ltsnr EQ l_ltsnr
+  AND a9~lifnr EQ l_infnr
+  AND a9~datab <= sy-datum
+  AND a9~datbi >= sy-datum.
+*•  OrgCompras/Proveedor/
+  SELECT kp~kbetr
+  APPENDING TABLE it_kbtr
+  FROM t001w AS tw
+  INNER JOIN a911 AS a9 ON ( a9~ekorg EQ tw~ekorg )
+  INNER JOIN konp AS kp ON ( kp~knumh  EQ a9~knumh )
+  WHERE tw~werks EQ l_werks
+  AND a9~kschl IN ( 'ZDC1','ZDC2' ,'ZDC3', 'ZDC4', 'ZDC5', 'ZDC6'  )
+  AND a9~lifnr EQ l_lifnr
+  AND a9~datab <= sy-datum
+  AND a9~datbi >= sy-datum.
+*•  OrgCompras/Proveedor/Artículo/Centro
+
+
+
+  IF  l_bwscl EQ '2'.
+*• OrgCompras/Proveedor/Artículo
+    SELECT kp~kbetr
+    APPENDING TABLE it_kbtr
+    FROM t001w AS tw
+    INNER JOIN a912 AS a9 ON ( a9~ekorg EQ tw~ekorg )
+    INNER JOIN konp AS kp ON ( kp~knumh  EQ a9~knumh )
+    WHERE tw~werks EQ l_werks
+    AND a9~kschl IN ( 'ZDE1','ZDE2' ,'ZDE3', 'ZDE4', 'ZDE5', 'ZDE6','ZBON'  )
+    AND a9~lifnr EQ l_lifnr
+    AND a9~matnr EQ l_matnr
+    AND a9~datab <= sy-datum
+    AND a9~datbi >= sy-datum.
+
+    SELECT kp~kbetr
+   APPENDING TABLE it_kbtr
+   FROM t001w AS tw
+   INNER JOIN a914 AS a9 ON ( a9~ekorg EQ tw~ekorg AND a9~werks EQ tw~werks )
+   INNER JOIN konp AS kp ON ( kp~knumh  EQ a9~knumh )
+   WHERE tw~werks EQ l_model
+   AND a9~kschl IN ( 'ZDE1','ZDE2' ,'ZDE3', 'ZDE4', 'ZDE5', 'ZDE6','ZBON'  )
+   AND a9~lifnr EQ l_lifnr
+   AND a9~matnr EQ l_matnr
+   AND a9~datab <= sy-datum
+   AND a9~datbi >= sy-datum.
+  ELSE.
+    SELECT kp~kbetr
+    APPENDING TABLE it_kbtr
+    FROM t001w AS tw
+    INNER JOIN a914 AS a9 ON ( a9~ekorg EQ tw~ekorg AND a9~werks EQ tw~werks )
+    INNER JOIN konp AS kp ON ( kp~knumh  EQ a9~knumh )
+    WHERE tw~werks EQ l_werks
+    AND a9~kschl IN ( 'ZDE1','ZDE2' ,'ZDE3', 'ZDE4', 'ZDE5', 'ZDE6','ZBON'  )
+    AND a9~lifnr EQ l_lifnr
+    AND a9~matnr EQ l_matnr
+    AND a9~datab <= sy-datum
+    AND a9~datbi >= sy-datum.
+  ENDIF.
+
+  LOOP AT it_kbtr INTO DATA(lt_data1).
+    l_kbetr = l_kbetr - abs( ( (  lt_data1-kbetr / 10 ) * l_kbetr ) / 100 ).
+  ENDLOOP.
+
+
+
+  SELECT SINGLE umrez umren
+  INTO ( l_umrez, l_umren )
+  FROM marm
+  WHERE matnr EQ l_matnr
+  AND meinh EQ l_kmein.
+
+  l_verpr = l_kbetr / ( l_umrez / l_umren  ).
+ENDFORM.
+FORM sales_orderchange USING salesdocument .
+  DATA : i_vbeln TYPE vbeln,
+         return  TYPE TABLE OF bapiret2.
+
+  MOVE : salesdocument TO i_vbeln.
+
+  CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+    EXPORTING
+      input  = i_vbeln
+    IMPORTING
+      output = i_vbeln.
+
+
+
+
+  SELECT  DISTINCT kv~kposn, kv~stunr, kv~zaehk, kv~kschl
+  INTO CORRESPONDING FIELDS OF TABLE @it_saleschange
+  FROM vbkd AS vb
+  INNER JOIN vbak AS va ON ( va~vbeln EQ vb~vbeln )
+  INNER JOIN konv AS kv ON ( kv~knumv EQ va~knumv AND vb~posnr EQ kv~kposn )
+  WHERE vb~vbeln EQ @i_vbeln
+  AND vb~ihrez NE ' '
+  AND kv~kschl IN ( 'ZDE1', 'ZDE2','ZDE3' )
+  AND kv~kappl EQ 'V'.
+
+  LOOP AT it_saleschange.
+
+
+
+    conditions_in-itm_number     = it_saleschange-kposn.
+    conditions_in-cond_st_no     = it_saleschange-stunr.
+    conditions_in-cond_count     = it_saleschange-zaehk.
+    conditions_in-cond_type      = it_saleschange-kschl.
+    conditions_in-cond_value     = '0.0'.
+    APPEND conditions_in TO conditions_in_t.
+
+    conditions_inx-itm_number    = it_saleschange-kposn.
+    conditions_inx-cond_st_no    = it_saleschange-stunr.
+    conditions_inx-cond_count    = it_saleschange-zaehk.
+    conditions_inx-cond_type     = it_saleschange-kschl.
+    conditions_inx-updateflag    = 'U'.
+    conditions_inx-cond_value    = 'X'.
+    conditions_inx-currency      = 'X'.
+    APPEND conditions_inx TO conditions_inx_t.
+    order_header_inx-updateflag  = 'U'.
+
+    CALL FUNCTION 'BAPI_SALESORDER_CHANGE'
+      EXPORTING
+        salesdocument    = i_vbeln
+        order_header_inx = order_header_inx
+      TABLES
+        return           = return
+        conditions_in    = conditions_in_t
+        conditions_inx   = conditions_inx_t.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = 'X'.
+
+
+    CLEAR : conditions_in, conditions_in_t[],conditions_inx,conditions_inx_t[].
+  ENDLOOP.
+
+ENDFORM.
+FORM bapi_desc_veladoras USING salesorder. "BAPI_SALESORDER_CHANGE para aplicar descuentos en pedidos de veladoras MAPL 27.09.2019
+
+  DATA : i_vbeln  TYPE vbeln,
+         return   TYPE TABLE OF bapiret2,
+         i_kwmeng TYPE vbap-kwmeng,
+         i_cond   TYPE  vbkd-zterm,
+         lv_datab TYPE datab,
+         lv_datbi TYPE datbi,
+         lv_low   TYPE tvarvc-low,
+         lv_high  TYPE tvarvc-high.
+
+
+
+  SELECT SINGLE low, high
+  INTO ( @lv_low, @lv_high )
+  FROM tvarvc WHERE name = 'ZSD_VIG_VELAS'.
+
+  MOVE:lv_low TO lv_datab,
+       lv_high TO lv_datbi.
+
+
+  IF sy-datum BETWEEN lv_low AND lv_high .
+
+    MOVE : salesorder TO i_vbeln.
+
+    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+      EXPORTING
+        input  = i_vbeln
+      IMPORTING
+        output = i_vbeln.
+
+  SELECT SINGLE low
+  INTO  @DATA(lv_condition)
+  FROM tvarvc
+  WHERE name EQ 'ZSD_COND_VELAS'.
+
+
+
+
+    SELECT SINGLE kwmeng
+    INTO i_kwmeng
+    FROM vbap
+    WHERE vbeln EQ i_vbeln
+    AND matkl NOT IN ( SELECT low FROM  tvarvc WHERE name EQ 'ZSD_GRUP_VELAS' ).
+
+    IF sy-subrc NE 0.
+      SELECT SINGLE zterm
+      INTO i_cond
+      FROM vbkd
+      WHERE vbeln EQ i_vbeln
+      AND zterm NOT IN ( 'Y000', 'Y001' ).
+      IF sy-subrc EQ 0 .
+
+        SELECT SUM( kwmeng )
+        INTO i_kwmeng
+        FROM vbap
+        WHERE vbeln EQ i_vbeln
+        AND vrkme EQ 'CJA'.
+        IF i_kwmeng >= 5.
+
+          move lv_condition to order_header_in-pmnttrms.
+          order_header_inx-updateflag = 'U'.
+          order_header_inx-pmnttrms = 'X'.
+
+          CALL FUNCTION 'BAPI_SALESORDER_CHANGE'
+            EXPORTING
+              salesdocument    = i_vbeln
+              order_header_in  = order_header_in
+              order_header_inx = order_header_inx
+            TABLES
+              return           = return.
+
+          CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+            EXPORTING
+              wait = 'X'.
+
+
+
+        ENDIF.
+
+
+
+      ENDIF.
+    ENDIF.
+
+
+
+
+
+  ENDIF.
+
+
+
+ENDFORM.
+
